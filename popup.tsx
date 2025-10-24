@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { AuthProvider, useAuth } from "@/contexts/user"
 import { UserActivityProvider, useUserActivity } from "@/contexts/activity"
-import { UserPinsProvider, useUserPins } from "@/contexts/pins"
 import { AudiencesProvider, useAudiences } from "@/contexts/audiences"
 import { PlanDataProvider } from "@/contexts/plan"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -13,11 +12,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 
 import { Icons } from "@/components/icons"
 import { UserAccountNav } from "@/components/user-account-nav"
-import DebugAudiences from "@/components/debug-audiences"
 import AddToAudienceButton from "@/components/add-to-audience-button"
 import AudiencesList from "@/components/audiences-list"
-import { getPlatformLogo } from "~lib/platform-logos"
-import { baseUrl, baseApiUrl } from "~lib/constants"
+import { baseUrl } from "~lib/constants"
 import Logger from "@/lib/logger"
 import UserPlanPopup from "@/components/user-plan-popup"
 import ExtensionActionsBar from "@/components/extension-actions-bar"
@@ -46,11 +43,9 @@ const Popup = () => {
         <AuthProvider>
           <PlanDataProvider>
             <UserActivityProvider>
-              <UserPinsProvider>
-                <AudiencesProvider>
-                  <PopupPage />
-                </AudiencesProvider>
-              </UserPinsProvider>
+              <AudiencesProvider>
+                <PopupPage />
+              </AudiencesProvider>
             </UserActivityProvider>
           </PlanDataProvider>
         </AuthProvider>
@@ -62,7 +57,6 @@ const Popup = () => {
 const PopupPage = () => {
   const user = useAuth()
   const { activity, status } = useUserActivity()
-  const { pins, status: pinsStatus } = useUserPins()
   const { audiences, status: audiencesStatus } = useAudiences()
   const [activitySummaries, setActivitySummaries] =
     useState<ActionsByURLAndDate>({})
