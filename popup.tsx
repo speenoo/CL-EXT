@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { AuthProvider, useAuth } from "@/contexts/user"
 import { UserActivityProvider, useUserActivity } from "@/contexts/activity"
 import { UserPinsProvider, useUserPins } from "@/contexts/pins"
+import { AudiencesProvider, useAudiences } from "@/contexts/audiences"
 import { PlanDataProvider } from "@/contexts/plan"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
@@ -10,11 +11,16 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Icons } from "@/components/icons"
 import { UserAccountNav } from "@/components/user-account-nav"
+import DebugAudiences from "@/components/debug-audiences"
+import AddToAudienceButton from "@/components/add-to-audience-button"
+import AudiencesList from "@/components/audiences-list"
+import { getPlatformLogo } from "~lib/platform-logos"
 import { baseUrl, baseApiUrl } from "~lib/constants"
+import Logger from "@/lib/logger"
 import UserPlanPopup from "@/components/user-plan-popup"
+import ExtensionActionsBar from "@/components/extension-actions-bar"
 import type { ActionsByURLAndDate } from "~types"
 
 import "~/contents/base.css"
@@ -41,7 +47,9 @@ const Popup = () => {
           <PlanDataProvider>
             <UserActivityProvider>
               <UserPinsProvider>
-                <PopupPage />
+                <AudiencesProvider>
+                  <PopupPage />
+                </AudiencesProvider>
               </UserPinsProvider>
             </UserActivityProvider>
           </PlanDataProvider>
@@ -55,8 +63,12 @@ const PopupPage = () => {
   const user = useAuth()
   const { activity, status } = useUserActivity()
   const { pins, status: pinsStatus } = useUserPins()
+  const { audiences, status: audiencesStatus } = useAudiences()
   const [activitySummaries, setActivitySummaries] =
     useState<ActionsByURLAndDate>({})
+  const [selectedAudience, setSelectedAudience] = useState<any>(null)
+
+  const authLogger = new Logger("dossi AUTH")
 
   const handleLinkClick = (url: string) => {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -96,28 +108,81 @@ const PopupPage = () => {
     setActivitySummaries(groupedActions)
   }, [activity])
 
+  // Log authentication state transitions for debugging
+  useEffect(() => {
+    if (!user) return
+    authLogger.info(
+      `Auth state changed (popup): status=${user?.status}, isAuthed=${Boolean(
+        user?.isAuthed
+      )}`
+    )
+    if (user?.isAuthed && user?.attrs) {
+      authLogger.info(
+        `User (popup): id=${user?.attrs?.id}, email=${user?.attrs?.email}, name=${user?.attrs?.name}`
+      )
+    }
+  }, [user?.status, user?.isAuthed])
+
+  // Debug log audiences
+  useEffect(() => {
+    console.log("🎯 DEBUG Audiences in Popup:", {
+      audiences,
+      status: audiencesStatus,
+      count: audiences?.length || 0,
+    })
+  }, [audiences, audiencesStatus])
+
+  // Clear selected audience when audiences are being refreshed (org change)
+  useEffect(() => {
+    if (selectedAudience) {
+      setSelectedAudience(null)
+    }
+  }, [audiencesStatus])
+
   return (
     <>
       {user && user?.isAuthed ? (
         <div
           className="flex max-h-full flex-col space-y-1.5 p-6"
           style={{ height: "600px", width: "350px" }}>
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-foreground">dossi</h1>
-            <div className="flex items-center gap-2">
-              <UserAccountNav user={user} />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-lg font-semibold text-foreground">ContactLevel</h1>
+              <div className="flex items-center gap-2">
+                <UserAccountNav user={user} />
+              </div>
             </div>
-          </div>
-          <UserPlanPopup />
-          <Separator />
+            {user?.organizations && user?.organizations.length > 0 && (
+              <>
+                <ExtensionActionsBar
+                  token={user?.attrs?.id || ""}
+                  organizations={user.organizations.map((org) => ({
+                    id: org.id,
+                    name: org.name,
+                    slug: org.slug,
+                    logo: org.logo,
+                    memberCount: 0, // not available from extension session
+                  }))}
+                  currentOrganizationId={user.organizations[0]?.id || null}
+                  userId={user?.attrs?.id}
+                />
+              </>
+            )}
+            <UserPlanPopup />
+            <Separator />
 
-          <Tabs defaultValue="recent" className="w-[300]">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="recent">Recent</TabsTrigger>
-              <TabsTrigger value="pins">Pins</TabsTrigger>
-            </TabsList>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Audiences Section */}
+              <AudiencesList
+                audiences={audiences}
+                status={audiencesStatus}
+                selectedAudienceId={selectedAudience?.id}
+                onSelectAudience={setSelectedAudience}
+              />
 
-            <TabsContent value="recent">
+              {/* Activity Section */}
               <div className="mt-5">
                 {status === "loading" && (
                   <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -137,7 +202,7 @@ const PopupPage = () => {
                 )}
 
                 {status === "success" && activity && activity.length > 0 && (
-                  <ScrollArea className="h-[410px]">
+                  <ScrollArea className="h-[200px]">
                     {Object.entries(activitySummaries).map(
                       ([key, item], index) => (
                         <div
@@ -174,59 +239,19 @@ const PopupPage = () => {
                   </div>
                 )}
               </div>
-            </TabsContent>
-            <TabsContent value="pins">
-              <div className="mt-5">
-                {pinsStatus === "success" && pins && pins.length > 0 && (
-                  <ScrollArea className="h-[410px] ">
-                    {pins.map((pin, index) => (
-                      <div
-                        key={index}
-                        className="mb-3 grid grid-cols-[25px_1fr] items-start pb-4 last:mb-0">
-                        <span className="flex h-2 w-2 translate-y-1 rounded-full bg-amber-500" />
-                        <div
-                          className="cursor-pointer space-y-1"
-                          onClick={() => handleLinkClick(pin.url)}>
-                          <div className="pl-0 text-left text-sm leading-none">
-                            {new URL(pin.url).pathname
-                              .split("/")
-                              .slice(2)
-                              .join("/")}
-                          </div>
-                          {pin.entity?.title && (
-                            <p className="text-left text-xs text-muted-foreground">
-                              {pin.entity.title}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </ScrollArea>
-                )}
+            </div>
 
-                {pinsStatus === "success" && pins && pins.length === 0 && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 pl-2">
-                    <span>
-                      No pinned items yet. <br />
-                    </span>
-                  </div>
-                )}
-
-                {pinsStatus === "loading" && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <div className="my-5 flex items-center gap-3 space-x-4">
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-[220px]" />
-                        <Skeleton className="h-4 w-[100px]" />
-                        <Skeleton className="h-4 w-[241px]" />
-                        <Skeleton className="h-4 w-[110px]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+            {/* Sticky Button at Bottom */}
+            <div className="border-t border-neutral-200 pt-3 dark:border-neutral-700">
+              <AddToAudienceButton
+                selectedAudience={selectedAudience}
+                onAdd={async (audience) => {
+                  // API call will be implemented here
+                  console.log("Adding to audience:", audience)
+                }}
+              />
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ width: "350px", height: "200px" }}>
@@ -240,7 +265,11 @@ const PopupPage = () => {
             </div>
             <div className="grid gap-6">
               <Button asChild variant="outline">
-                <a href={`${baseApiUrl}/auth/signin`} target="_blank">
+                <a
+                  href={`${baseUrl}/extension/handoff2`}
+                  target="_blank"
+                  onClick={() => authLogger.info("Sign in clicked (popup)")}
+                >
                   <Icons.logo className="mr-4 h-4 w-4" />
                   Sign in to dossi
                 </a>

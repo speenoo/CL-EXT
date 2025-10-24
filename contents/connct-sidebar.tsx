@@ -42,7 +42,8 @@ import { UserAccountNav } from "@/components/user-account-nav"
 import { Icons } from "@/components/icons"
 import { UserLabelsProvider } from "@/contexts/labels"
 import { PlanDataProvider, usePlanData } from "@/contexts/plan"
-import { baseApiUrl } from "@/lib/constants"
+import { baseUrl } from "@/lib/constants"
+import Logger from "@/lib/logger"
 import { limitReached } from "@/lib/utils"
 
 import type { Entity, Tab } from "~types/entity"
@@ -54,7 +55,7 @@ import cssText from "data-text:~/contents/global.css"
 const queryClient = new QueryClient()
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://github.com/*"],
+  matches: ["https://linkedin.com/in/*"],
 }
 
 // Inject into the ShadowDOM
@@ -72,7 +73,9 @@ export const createShadowRoot: PlasmoCreateShadowRoot = (shadowHost) =>
   })
 
 export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
-  document.querySelector("#repository-details-container, .gh-header-show")
+  document.querySelector(
+    '[data-view-name="profile-primary-message"], [data-view-name="profile-overflow-button"], .pvs-header__actions'
+  ) || document.body
 
 const App = () => {
   return (
@@ -96,6 +99,8 @@ const ActionSheet = () => {
   const entity = useEntity()
   const { counts, limits } = usePlanData()
 
+  const authLogger = new Logger("dossi AUTH")
+
   const [redirect] = useStorage("redirect", { to: null, from: null })
 
   const [noteContent, setNoteContent] = useState<string>("")
@@ -108,6 +113,21 @@ const ActionSheet = () => {
   const [redirectDetected, setRedirectDetected] = useState<boolean>(false)
 
   const resetRedirectDetected = () => setRedirectDetected(false)
+
+  // Log authentication state transitions for debugging
+  useEffect(() => {
+    if (!user) return
+    authLogger.info(
+      `Auth state changed: status=${user?.status}, isAuthed=${Boolean(
+        user?.isAuthed
+      )}`
+    )
+    if (user?.isAuthed && user?.attrs) {
+      authLogger.info(
+        `User: id=${user?.attrs?.id}, email=${user?.attrs?.email}, name=${user?.attrs?.name}`
+      )
+    }
+  }, [user?.status, user?.isAuthed])
 
   useEffect(() => {
     const checkRedirectNotes = async () => {
@@ -378,7 +398,11 @@ const ActionSheet = () => {
         </Sheet>
       ) : (
         <Button asChild>
-          <a href={`${baseApiUrl}/auth/signin`} target="_blank">
+          <a
+            href={`${baseUrl}/extension/handoff2`}
+            target="_blank"
+            onClick={() => authLogger.info("Sign in clicked (content script)")}
+          >
             <Icons.logo className="mr-2 h-4 w-4" />
             dossi
           </a>

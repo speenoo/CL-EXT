@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { sendToBackground } from "@plasmohq/messaging"
+import type { ExtensionMembershipOrganizationDto } from "~types/dtos/membership-organization-dto"
 
 type CurrentUserStatus = "loading" | "error" | "success"
 
@@ -14,6 +15,7 @@ type User = {
     plan?: string
     role?: string
   }
+  organizations?: ExtensionMembershipOrganizationDto[]
 }
 
 type UserContextType = User | null

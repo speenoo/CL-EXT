@@ -1,6 +1,7 @@
 import type { PlasmoMessaging } from "@plasmohq/messaging"
 import { Storage } from "@plasmohq/storage"
 import type { User } from "~types/user"
+import type { ExtensionSessionDto } from "~types/dtos/session-dto"
 
 import { baseApiUrl } from "~lib/constants"
 
@@ -29,27 +30,34 @@ const handler: PlasmoMessaging.MessageHandler = async (req, res) => {
   }
 
   if (cookie && !user?.isAuthed) {
-    const resp = await fetch(`${baseApiUrl}/auth/session`, {
+    const resp = await fetch(`${baseApiUrl}/extension/session`, {
       method: "GET",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
     })
+    console.log("user fetch response:", resp)
 
     const ok = resp.ok
 
     if (resp.ok) {
-      const json = await resp.json()
-      if (json.user) {
-        // save and return user
-        const user = { isAuthed: true, attrs: json.user }
+      const json: Partial<ExtensionSessionDto> = await resp.json()
+      if (json?.user) {
+        // save and return user (include organizations if provided)
+        const nextUser: User = {
+          isAuthed: true,
+          attrs: json.user as User["attrs"],
+          ...(Array.isArray(json.organizations)
+            ? { organizations: json.organizations }
+            : {}),
+        }
 
-        await storage.set("user", user)
+        await storage.set("user", nextUser)
 
         return res.send({
           status: { ok },
-          user,
+          user: nextUser,
         })
       } else {
         // clear user & cache
