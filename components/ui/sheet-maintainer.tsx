@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
-import { VariantProps, cva } from "class-variance-authority"
+import { cva } from "class-variance-authority"
+import type { VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "~lib/utils"
@@ -11,7 +12,7 @@ const Sheet = SheetPrimitive.Root
 
 const SheetTrigger = SheetPrimitive.Trigger
 
-const portalVariants = cva("fixed inset-0 z-50 flex", {
+const portalVariants = cva("fixed inset-0 z-[2147483647] flex", {
   variants: {
     position: {
       top: "items-start",
@@ -27,13 +28,8 @@ interface SheetPortalProps
   extends SheetPrimitive.DialogPortalProps,
     VariantProps<typeof portalVariants> {}
 
-const SheetPortal = ({
-  position,
-  className,
-  children,
-  ...props
-}: SheetPortalProps) => (
-  <SheetPrimitive.Portal className={cn(className)} {...props}>
+const SheetPortal = ({ position, children, ...props }: SheetPortalProps) => (
+  <SheetPrimitive.Portal {...props}>
     <div className={portalVariants({ position })}>{children}</div>
   </SheetPrimitive.Portal>
 )
@@ -45,7 +41,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "inset-0 z-50 transition-all duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in",
+      "inset-0 z-[2147483647] transition-all duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in",
       className
     )}
     {...props}
@@ -55,7 +51,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "overflow-y-auto fixed z-50 scale-100 gap-4 bg-background p-6 opacity-100 shadow-lg border",
+  "overflow-y-auto fixed z-[2147483647] scale-100 gap-4 bg-background p-6 opacity-100 shadow-lg border",
   {
     variants: {
       position: {

@@ -9,11 +9,21 @@ import {
 import { baseUrl, baseApiUrl } from "~lib/constants"
 
 import { UserAvatar } from "@/components/user-avatar"
-import { usePlanData } from "@/contexts/plan"
 import { Icons } from "@/components/icons"
 
 export function UserAccountNav({ user }) {
-  const { plan } = usePlanData()
+  // Plan is optional in the content script context; the provider may not be mounted.
+  // Avoid destructuring from an undefined context to prevent runtime errors.
+  let plan: string | undefined
+  try {
+    // Lazy access to avoid crashing if provider is absent
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { usePlanData } = require("@/contexts/plan")
+    const ctx = usePlanData?.()
+    plan = ctx?.plan
+  } catch {
+    plan = undefined
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>
@@ -48,7 +58,7 @@ export function UserAccountNav({ user }) {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a
-            href={`${baseUrl}/dashboard`}
+            href={`${baseUrl}`}
             target="_blank"
             className="!text-primary !no-underline">
             <Icons.cloud className="mr-2 h-4 w-4" />

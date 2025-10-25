@@ -31,7 +31,6 @@ export function AudiencesList({
 
       {status === 'success' && audiences && audiences.length > 0 && (
         <div className="mt-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Audiences</h2>
           <div className="space-y-2">
             {audiences.map((audience) => (
               <button
@@ -43,11 +42,6 @@ export function AudiencesList({
                     : 'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900'
                 }`}>
                 <p className="font-medium leading-none text-left">{audience.name}</p>
-                {audience.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 text-left">
-                    {audience.description}
-                  </p>
-                )}
                 <div className="mt-2 flex gap-1">
                   {audience.linkedin && (
                     <div className="flex items-center gap-0.5 rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-xs dark:border-neutral-600 dark:bg-neutral-900">

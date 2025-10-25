@@ -8,7 +8,7 @@ const extensionName = "dossi"
 const storage = new Storage()
 const logger = new Logger("dossi")
 
-const uninstallUrl = "https://www.dossi.dev/uninstall"
+const uninstallUrl = "https://www.audiences.contactlevel.com"
 const installUrl = "https://www.dossi.dev/success-install"
 
 logger.info(`👋 Initializing ${extensionName}.`)
@@ -19,7 +19,11 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   }
 })
 
-chrome.tabs.query({ url: process.env.PLASMO_PUBLIC_MATCHES }, function (tabs) {
+// Ensure we attach URL change listeners only on LinkedIn profile pages
+// Use explicit patterns to cover both www and non-www hosts
+chrome.tabs.query(
+  { url: ["https://www.linkedin.com/in/*", "https://linkedin.com/in/*"] },
+  function (tabs) {
   for (let tab of tabs) {
     chrome.tabs.onUpdated.addListener((tabId, changeInfo, updatedTab) => {
       if (tabId === tab.id && changeInfo.status === "complete") {
@@ -33,22 +37,16 @@ chrome.tabs.query({ url: process.env.PLASMO_PUBLIC_MATCHES }, function (tabs) {
       }
     })
   }
-})
+}
+)
 
+// Track potential server redirects on LinkedIn profile pages so we can
+// reconcile any state keyed by URL (rare on LinkedIn due to SPA, but harmless)
 const patterns = [
   {
-    originAndPathMatches: `^https://github\.com/[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+/discussions/[0-9]+$`,
+    originAndPathMatches:
+      `^https://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9%\-_.]+/?$`,
   },
-  {
-    originAndPathMatches: `^https://github\.com/[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+/issues/[0-9]+$`,
-  },
-  {
-    originAndPathMatches: `^https://github\.com/[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+/pulls/[0-9]+$`,
-  },
-  {
-    originAndPathMatches: `^https://github\.com/[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$`,
-  },
-  { originAndPathMatches: `^https://github\.com/[a-zA-Z0-9\-_]+$` },
 ]
 
 patterns.forEach((pattern, pos) => {

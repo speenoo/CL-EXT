@@ -4,4 +4,6 @@ export type OrganizationDto = {
   name: string;
   slug: string;
   memberCount: number;
+  /** Total credits available to the organization (optional) */
+  creditsTotal?: number;
 };

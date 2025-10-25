@@ -24,6 +24,7 @@ import { Input } from './ui/input'
 import { ScrollArea } from './ui/scroll-area'
 
 import type { OrganizationDto } from '~/types/dtos/organization-dto'
+import { Button } from './ui/button'
 
 export type OrganizationDropdownProps = {
   organizations: OrganizationDto[]
@@ -71,10 +72,10 @@ export function OrganizationDropdown({
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant='outline'
           className={
-            'flex w-full items-center gap-2 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-left text-sm shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none data-[state=open]:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 ' +
+            'flex w-full h-12 items-center gap-2 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-left text-sm shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none data-[state=open]:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 ' +
             (className || '')
           }
         >
@@ -88,12 +89,17 @@ export function OrganizationDropdown({
             <span className="truncate font-semibold leading-tight">
               {activeOrganization.name}
             </span>
+            {typeof activeOrganization.creditsTotal === 'number' && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {activeOrganization.creditsTotal.toLocaleString()} credits
+              </span>
+            )}
             <ChevronsUpDownIcon className="ml-auto size-4 shrink-0 text-muted-foreground" />
           </div>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="rounded-lg p-0"
+        className="rounded-lg p-0 outline-none focus:outline-none"
         align="start"
         side="bottom"
         avoidCollisions={false}
@@ -106,7 +112,7 @@ export function OrganizationDropdown({
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full border-none! pl-8 shadow-none outline-none!"
+            className="w-full pl-8 !border-none !shadow-none !outline-none !ring-0 !ring-offset-0 focus-visible:!ring-0 focus-visible:!ring-offset-0"
           />
         </div>
         <DropdownMenuSeparator />
@@ -127,9 +133,16 @@ export function OrganizationDropdown({
                       {organization.name.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  {organization.name}
+                  <span className="truncate">{organization.name}</span>
+
+                  {typeof organization.creditsTotal === 'number' && (
+                    <div className="ml-auto mr-2 flex items-center whitespace-nowrap text-xs text-muted-foreground">
+                      {organization.creditsTotal.toLocaleString()} credits
+                    </div>
+                  )}
+
                   {activeOrganization.id === organization.id && (
-                    <div className="ml-auto flex size-4 items-center justify-center rounded-full bg-blue-500 text-primary-foreground">
+                    <div className="flex size-4 items-center justify-center rounded-full bg-blue-500 text-primary-foreground">
                       <CheckIcon className="text-current size-3 shrink-0" />
                     </div>
                   )}

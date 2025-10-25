@@ -9,4 +9,6 @@ export type ExtensionMembershipOrganizationDto = {
 	logo: string | null;
 	role: 'MEMBER' | 'ADMIN';
 	isOwner: boolean;
+	/** Total credits available to the organization for usage (from backend). */
+	creditsTotal: number;
 };

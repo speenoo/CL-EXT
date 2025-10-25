@@ -3,6 +3,9 @@ import { AuthProvider, useAuth } from "@/contexts/user"
 import { UserActivityProvider, useUserActivity } from "@/contexts/activity"
 import { AudiencesProvider, useAudiences } from "@/contexts/audiences"
 import { PlanDataProvider } from "@/contexts/plan"
+import { OrganizationProvider } from "@/contexts/organization"
+import { CreditsProvider } from "@/contexts/credits"
+import CurrentOrgCredits from "@/components/current-org-credits"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -43,9 +46,13 @@ const Popup = () => {
         <AuthProvider>
           <PlanDataProvider>
             <UserActivityProvider>
-              <AudiencesProvider>
-                <PopupPage />
-              </AudiencesProvider>
+              <OrganizationProvider>
+                <CreditsProvider>
+                  <AudiencesProvider>
+                    <PopupPage />
+                  </AudiencesProvider>
+                </CreditsProvider>
+              </OrganizationProvider>
             </UserActivityProvider>
           </PlanDataProvider>
         </AuthProvider>
@@ -142,8 +149,11 @@ const PopupPage = () => {
           <div className="flex flex-1 flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-semibold text-foreground">ContactLevel</h1>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <h1 className="text-lg font-semibold text-foreground">ContactLevel</h1>
+                <CurrentOrgCredits />
+              </div>
+              <div className="flex items-center gap-2 mb-4">
                 <UserAccountNav user={user} />
               </div>
             </div>
@@ -157,6 +167,7 @@ const PopupPage = () => {
                     slug: org.slug,
                     logo: org.logo,
                     memberCount: 0, // not available from extension session
+                    creditsTotal: typeof org.creditsTotal === 'number' ? org.creditsTotal : undefined,
                   }))}
                   currentOrganizationId={user.organizations[0]?.id || null}
                   userId={user?.attrs?.id}
@@ -164,7 +175,7 @@ const PopupPage = () => {
               </>
             )}
             <UserPlanPopup />
-            <Separator />
+            
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto">
@@ -236,7 +247,7 @@ const PopupPage = () => {
             </div>
 
             {/* Sticky Button at Bottom */}
-            <div className="border-t border-neutral-200 pt-3 dark:border-neutral-700">
+            <div className="pt-3">
               <AddToAudienceButton
                 selectedAudience={selectedAudience}
                 onAdd={async (audience) => {

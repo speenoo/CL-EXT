@@ -1,10 +1,8 @@
+// Patch Trusted Types before anything else in this isolated world
+import "~/contents/tt-shim"
 import { useEffect } from "react"
 
-import type {
-  PlasmoCSConfig,
-  PlasmoCreateShadowRoot,
-  PlasmoGetInlineAnchor,
-} from "plasmo"
+import type { PlasmoCSConfig, PlasmoCreateShadowRoot, PlasmoGetInlineAnchor } from "plasmo"
 
 import { AuthProvider, useAuth } from "@/contexts/user"
 import { AudiencesProvider } from "@/contexts/audiences"
@@ -33,7 +31,10 @@ import cssText from "data-text:~/contents/global.css"
 const queryClient = new QueryClient()
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://linkedin.com/in/*"],
+  // Broaden match to all LinkedIn pages to guarantee injection even on SPA variants,
+  // we’ll self-guard at runtime to only render on /in/ profiles.
+  matches: ["https://*.linkedin.com/*"],
+  run_at: "document_idle",
 }
 
 // Inject into the ShadowDOM
@@ -45,17 +46,89 @@ export const getStyle = () => {
 
 export const getShadowHostId = () => "dossi-sb"
 
-export const createShadowRoot: PlasmoCreateShadowRoot = (shadowHost) =>
-  shadowHost.attachShadow({
+export const createShadowRoot: PlasmoCreateShadowRoot = (shadowHost) => {
+  // Make the host participate nicely in LinkedIn's action row layout
+  shadowHost.style.display = "inline-flex"
+  shadowHost.style.alignItems = "center"
+  shadowHost.style.marginLeft = "8px"
+  shadowHost.setAttribute("data-dossi-host", "")
+  return shadowHost.attachShadow({
     mode: process.env.NODE_ENV === "production" ? "closed" : "open",
   })
+}
 
-export const getInlineAnchor: PlasmoGetInlineAnchor = () =>
-  document.querySelector(
-    '[data-view-name="profile-primary-message"], [data-view-name="profile-overflow-button"], .pvs-header__actions'
-  ) || document.body
+// Mount our UI within the LinkedIn profile action button group
+let anchorLogged = false
+
+export const getInlineAnchor: PlasmoGetInlineAnchor = () => {
+  try {
+    // Keep logs minimal to avoid console spam on LinkedIn's frequent reflows
+    if (!anchorLogged) console.log("[dossi] getInlineAnchor start", location.href)
+
+    // 1) Scope to Topcard and find the overflow button inside it to avoid the sticky header clone
+    const topCard = (document.querySelector(
+      'div[componentkey$="Topcard"], div[componentkey*="Topcard"]'
+    ) || document.querySelector('[componentkey*="Topcard"]')) as HTMLElement
+    if (topCard) {
+      const overflowInTop = topCard.querySelector(
+        '[data-view-name="profile-overflow-button"]'
+      ) as HTMLElement
+      if (overflowInTop && overflowInTop.parentElement) {
+        if (!anchorLogged)
+          console.log("[dossi] using Topcard action row as anchor", overflowInTop.parentElement)
+        anchorLogged = true
+        return overflowInTop.parentElement as HTMLElement
+      }
+      // As a fallback within Topcard, use its container
+      if (!anchorLogged) console.log("[dossi] using Topcard container", topCard)
+      anchorLogged = true
+      return topCard
+    }
+
+    // 2) Global overflow button (may resolve to sticky header on some variants)
+    const overflowBtn = document.querySelector(
+      '[data-view-name="profile-overflow-button"]'
+    ) as HTMLElement
+    if (overflowBtn && overflowBtn.parentElement) {
+      if (!anchorLogged)
+        console.log("[dossi] using global overflow parent (no Topcard found)", overflowBtn.parentElement)
+      anchorLogged = true
+      return overflowBtn.parentElement as HTMLElement
+    }
+
+    // 3) Fallback to a common header actions container if present
+    const headerActions = document.querySelector(
+      '.pvs-header__actions'
+    ) as HTMLElement
+    if (headerActions) {
+      if (!anchorLogged) console.log("[dossi] using headerActions", headerActions)
+      anchorLogged = true
+      return headerActions
+    }
+
+    if (!anchorLogged) console.log("[dossi] falling back to document.body as anchor")
+    anchorLogged = true
+  } catch (e) {
+    console.warn("[dossi] getInlineAnchor error:", e)
+  }
+
+  // Final fallback: mount at the end of the body (always available)
+  return document.body
+}
+
+try {
+  console.log("[dossi] content script loaded for:", location.href)
+} catch {}
+
+export const shouldMount = async () => /^\/in\//.test(location.pathname)
+
+const isProfilePath = () => /^\/in\//.test(location.pathname)
 
 const App = () => {
+  if (!isProfilePath()) {
+    // Do not render UI unless on a profile; keeps host inert on non-profile pages.
+    return null
+  }
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
@@ -93,7 +166,7 @@ const ActionSheet = () => {
       {user?.isAuthed ? (
         <Sheet modal={false}>
           <SheetTrigger asChild className="justify-end">
-            <Button variant="default" className="border-primary-text border">
+            <Button variant="outline" className="">
               <Icons.logo className="mr-2 h-4 w-4" />
               Contactlevel
             </Button>

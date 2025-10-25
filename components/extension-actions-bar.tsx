@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from 'react'
+import { Storage } from '@plasmohq/storage'
 import OrganizationDropdown from './organization-dropdown'
 import type { OrganizationDto } from '~/types/dtos/organization-dto'
 import { useAudiences } from '~/contexts/audiences'
+import { useOrganization } from '~/contexts/organization'
 
 // lightweight in-component fetcher for org audiences via our Next.js API route
 async function fetchAudiences(token: string, organizationId: string): Promise<Array<{ id: string; name: string; facebook: boolean; google: boolean; linkedin: boolean }>> {
@@ -31,9 +33,43 @@ export default function ExtensionActionsBar({ token, organizations, currentOrgan
   const [audiences, setAudiences] = React.useState<Array<{ id: string; name: string; facebook: boolean; google: boolean; linkedin: boolean }>>([])
   const [loadingAudiences, setLoadingAudiences] = React.useState(false)
   const { setSelectedOrganizationId } = useAudiences()
+  const { setSelectedOrganizationId: setOrgIdGlobal } = useOrganization()
+
+  // Persist last selected organization per user using Plasmo Storage
+  const storageRef = React.useRef<Storage | null>(null)
+  if (storageRef.current === null) {
+    storageRef.current = new Storage({ area: 'local' })
+  }
+  const storage = storageRef.current
+  const storageKey = React.useMemo(() => `last-org-by-user:${userId ?? 'anonymous'}`, [userId])
+
+  // On mount, try restoring last selected organization from storage
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const last = await storage.get<string>(storageKey)
+        if (!mounted) return
+        if (last && organizations.some((o) => o.id === last)) {
+          setSelectedOrgId(last)
+        }
+      } catch {}
+    })()
+    return () => {
+      mounted = false
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, organizations.length])
+
+  // Whenever selected org changes (including restore), propagate to audiences context
+  React.useEffect(() => {
+    if (selectedOrgId) {
+      setSelectedOrganizationId(selectedOrgId)
+    }
+  }, [selectedOrgId, setSelectedOrganizationId])
 
   React.useEffect(() => {
-    if (!token || !selectedOrgId) return
+  if (!token || !selectedOrgId) return
     setLoadingAudiences(true)
     fetchAudiences(token, selectedOrgId)
       .then((list) => {
@@ -53,6 +89,9 @@ export default function ExtensionActionsBar({ token, organizations, currentOrgan
           console.debug('[ExtensionActionsBar] organization changed', { from: selectedOrgId, to: org.id })
           setSelectedOrgId(org.id)
           setSelectedOrganizationId(org.id)
+          setOrgIdGlobal(org.id)
+          // Persist chosen org id
+          storage.set(storageKey, org.id).catch(() => {})
         }}
       />
     </div>
