@@ -68,10 +68,12 @@ const pickClosestAfter = (
 	const anchorTop = rect?.top ?? 0
 	let best: { el: Element; score: number } | undefined
 	for (const el of candidates) {
-		if (!predicate(el)) continue
+		// Skip the anchor itself and anything that does not match the predicate
+		if (el === anchor || !predicate(el)) continue
 		const top = (el as HTMLElement).getBoundingClientRect?.().top ?? Infinity
 		const dy = top - anchorTop
-		if (dy >= 0 && (best === undefined || dy < best.score)) {
+		// Require a strictly positive offset so we don't select the header itself
+		if (dy > 0 && (best === undefined || dy < best.score)) {
 			best = { el, score: dy }
 		}
 	}
@@ -300,6 +302,9 @@ const getCurrentTitle = (root: Root): string | undefined => {
 			const t = normalizeText(el.textContent)
 			if (!t) return false
 			if (t.length > 100 || t.length < 3) return false
+			// Eliminate the section header and common non-title labels
+			if (/^experience$/i.test(t)) return false
+			if (/^(show all|see all)$/i.test(t)) return false
 			// Avoid company-only lines; prefer role titles (often Title Case, with nouns)
 			return /[A-Za-z]/.test(t) && !/\b(Inc\.|LLC|Ltd|University|School|Company|Corp|Corporation|Institute)\b/i.test(t)
 		})

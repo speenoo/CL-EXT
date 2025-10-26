@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from "@/contexts/user"
 import { UserActivityProvider, useUserActivity } from "@/contexts/activity"
 import { AudiencesProvider, useAudiences } from "@/contexts/audiences"
 import { PlanDataProvider } from "@/contexts/plan"
-import { OrganizationProvider } from "@/contexts/organization"
+import { OrganizationProvider, useOrganization } from "@/contexts/organization"
 import { CreditsProvider } from "@/contexts/credits"
 import CurrentOrgCredits from "@/components/current-org-credits"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -19,13 +19,16 @@ import AddToAudienceButton from "@/components/add-to-audience-button"
 import AudiencesList from "@/components/audiences-list"
 import { baseUrl } from "~lib/constants"
 import Logger from "@/lib/logger"
-import UserPlanPopup from "@/components/user-plan-popup"
 import ExtensionActionsBar from "@/components/extension-actions-bar"
 import type { ActionsByURLAndDate } from "~types"
 
 import "~/contents/base.css"
 
 import cssText from "data-text:~/styles/globals.css"
+import { sendToBackground } from "@plasmohq/messaging"
+import { Storage } from "@plasmohq/storage"
+import DebugCookies from "~components/debug/debug-cookies"
+import ScraperDebug from "~components/debug/scraper-debug"
 
 // Inject into the ShadowDOM
 export const getStyle = () => {
@@ -63,11 +66,13 @@ const Popup = () => {
 
 const PopupPage = () => {
   const user = useAuth()
+  const { selectedOrganizationId } = useOrganization()
   const { activity, status } = useUserActivity()
   const { audiences, status: audiencesStatus } = useAudiences()
   const [activitySummaries, setActivitySummaries] =
     useState<ActionsByURLAndDate>({})
   const [selectedAudience, setSelectedAudience] = useState<any>(null)
+  const [isAdding, setIsAdding] = useState(false)
 
   const authLogger = new Logger("dossi AUTH")
 
@@ -174,7 +179,6 @@ const PopupPage = () => {
                 />
               </>
             )}
-            <UserPlanPopup />
             
 
             {/* Scrollable Content */}
@@ -245,14 +249,72 @@ const PopupPage = () => {
                 )}
               </div>
             </div>
+            
+            
 
-            {/* Sticky Button at Bottom */}
+            {/* Sticky Button at Bottom <ScraperDebug /> */}
             <div className="pt-3">
               <AddToAudienceButton
                 selectedAudience={selectedAudience}
+                isLoading={isAdding}
                 onAdd={async (audience) => {
-                  // API call will be implemented here
-                  console.log("Adding to audience:", audience)
+                  if (!user?.attrs?.id) return
+                  const orgId = selectedOrganizationId || user?.organizations?.[0]?.id
+                  if (!orgId) return
+                  setIsAdding(true)
+                  try {
+                    const storage = new Storage({ area: 'local' })
+                    let pageVisitId = await storage.get<string>('currentPageVisitId')
+                    if (!pageVisitId) {
+                      console.warn('No currentPageVisitId found; attempting to record visit now')
+                      // Try to determine active tab URL and ask background to record visit
+                      const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) =>
+                        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []))
+                      )
+                      const url = tabs?.[0]?.url || undefined
+                      if (url && /^https?:\/\/(?:www\.)?linkedin\.com\/in\//.test(url)) {
+                        try {
+                          const rv = await sendToBackground({
+                            name: 'record-visit-now' as never,
+                            body: {
+                              url,
+                              organizationId: orgId,
+                              actorId: user.attrs.id,
+                              accountId: user.attrs.id,
+                              type: 'profile'
+                            } as never
+                          })
+                          if (rv?.status?.ok && rv?.data?.pageVisitId) {
+                            pageVisitId = rv.data.pageVisitId
+                          } else {
+                            console.warn('record-visit-now failed', rv?.status?.error)
+                          }
+                        } catch (e) {
+                          console.error('record-visit-now error', e)
+                        }
+                      }
+                    }
+
+                    const { status, data } = await sendToBackground({
+                      name: 'add-contact' as never,
+                      body: {
+                        organizationId: orgId,
+                        actorId: user.attrs.id,
+                        audienceIds: [audience.id],
+                        pageVisitId: pageVisitId,
+                        shouldSync: true
+                      } as never
+                    })
+                    if (!status?.ok) {
+                      console.error('Add contact failed', status?.error)
+                    } else {
+                      console.log('Add contact job created', data)
+                    }
+                  } catch (e) {
+                    console.error('Add contact error', e)
+                  } finally {
+                    setIsAdding(false)
+                  }
                 }}
               />
             </div>
@@ -276,13 +338,13 @@ const PopupPage = () => {
                   onClick={() => authLogger.info("Sign in clicked (popup)")}
                 >
                   <Icons.logo className="mr-4 h-4 w-4" />
-                  Sign in to dossi
+                  Sign in to Contactlevel
                 </a>
               </Button>
             </div>
             <p className="px-8 text-center text-sm text-muted-foreground">
               <a
-                href={`${baseUrl}/register`}
+                href={`${baseUrl}/signup`}
                 target="_blank"
                 className="hover:text-brand underline underline-offset-4">
                 Don&apos;t have an account? Sign Up

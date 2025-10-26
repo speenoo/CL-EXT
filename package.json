@@ -69,7 +69,10 @@
 				"id": "{6b8b7ff4-0d93-4657-ae22-eea2b2f35113}"
 			}
 		},
-		"host_permissions": ["$PLASMO_PUBLIC_MANIFEST_HOST_PERMISSIONS"],
+		"host_permissions": [
+			"$PLASMO_PUBLIC_MANIFEST_HOST_PERMISSIONS",
+			"https://*.linkedin.com/*"
+		],
 		"permissions": ["tabs", "cookies", "webNavigation"]
 	}
 }
